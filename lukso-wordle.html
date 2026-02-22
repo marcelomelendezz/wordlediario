@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WORDLE · LUKSO Daily</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a0f;
+    --surface: #0d1821;
+    --border: #1a2e42;
+    --accent: #fe005b;
+    --accent2: #00f5ff;
+    --gold: #ffd700;
+    --text: #c8e6f5;
+    --muted: #4a6a82;
+    --correct: #00e676;
+    --present: #ffd700;
+    --absent: #1e3448;
+    --key-bg: #0d2236;
+    --key-text: #8ab8d4;
+    --glow-green: 0 0 20px rgba(0,230,118,0.5);
+    --glow-yellow: 0 0 20px rgba(255,215,0,0.5);
+    --glow-red: 0 0 20px rgba(254,0,91,0.5);
+    --glow-cyan: 0 0 20px rgba(0,245,255,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 50% 20%, rgba(0,245,255,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(254,0,91,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    width: 100%;
+    max-width: 520px;
+    padding: 20px 20px 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 1.4rem;
+    letter-spacing: 0.15em;
+    color: var(--accent2);
+    text-shadow: var(--glow-cyan);
+  }
+
+  .logo span {
+    color: var(--accent);
+    text-shadow: var(--glow-red);
+  }
+
+  .day-info {
+    text-align: right;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+  }
+
+  .day-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.1rem;
+    color: var(--accent2);
+    font-weight: 700;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    padding: 8px 0 4px;
+    text-transform: uppercase;
+  }
+
+  /* MESSAGE */
+  #message-bar {
+    min-height: 28px;
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    color: var(--accent2);
+    padding: 4px 20px;
+    position: relative;
+    z-index: 10;
+    text-shadow: var(--glow-cyan);
+    transition: opacity 0.3s;
+  }
+
+  /* GRID */
+  #grid-wrap {
+    position: relative;
+    z-index: 10;
+    padding: 10px 0;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 6px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+
+  .tile {
+    width: 58px;
+    height: 58px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    background: var(--surface);
+    position: relative;
+    transition: border-color 0.15s, transform 0.1s;
+    transform-style: preserve-3d;
+    cursor: default;
+    user-select: none;
+  }
+
+  .tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .tile.filled {
+    border-color: var(--accent2);
+    box-shadow: 0 0 8px rgba(0,245,255,0.2);
+    animation: pop 0.1s ease;
+  }
+
+  .tile.shake {
+    animation: shake 0.4s ease;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  /* Flip reveal */
+  .tile.flip {
+    animation: flip 0.5s ease forwards;
+  }
+
+  @keyframes flip {
+    0%   { transform: rotateX(0deg); }
+    50%  { transform: rotateX(-90deg); }
+    100% { transform: rotateX(0deg); }
+  }
+
+  .tile.correct {
+    background: #003d1f;
+    border-color: var(--correct);
+    color: var(--correct);
+    box-shadow: var(--glow-green);
+  }
+
+  .tile.present {
+    background: #3d2f00;
+    border-color: var(--present);
+    color: var(--present);
+    box-shadow: var(--glow-yellow);
+  }
+
+  .tile.absent {
+    background: var(--absent);
+    border-color: #0a1c2a;
+    color: var(--muted);
+  }
+
+  /* KEYBOARD */
+  #keyboard {
+    position: relative;
+    z-index: 10;
+    padding: 12px 8px 20px;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .kb-row {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 5px;
+  }
+
+  .key {
+    height: 52px;
+    min-width: 36px;
+    padding: 0 6px;
+    background: var(--key-bg);
+    border: 1px solid var(--border);
+    color: var(--key-text);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .key::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .key:hover {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    box-shadow: 0 0 10px rgba(0,245,255,0.2);
+    transform: translateY(-1px);
+  }
+
+  .key:active {
+    transform: translateY(1px);
+  }
+
+  .key.wide { min-width: 56px; font-size: 0.6rem; }
+
+  .key.correct {
+    background: #003d1f;
+    border-color: var(--correct);
+    color: var(--correct);
+    box-shadow: var(--glow-green);
+  }
+
+  .key.present {
+    background: #3d2f00;
+    border-color: var(--present);
+    color: var(--present);
+  }
+
+  .key.absent {
+    background: #060f18;
+    border-color: #0a1a28;
+    color: #1e3448;
+  }
+
+  /* MODAL */
+  #modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(2,8,14,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+
+  #modal.show { display: flex; }
+
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--accent2);
+    box-shadow: 0 0 40px rgba(0,245,255,0.15), 0 0 80px rgba(0,245,255,0.05);
+    padding: 36px 40px;
+    max-width: 360px;
+    width: 90%;
+    text-align: center;
+    animation: modal-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes modal-in {
+    from { transform: scale(0.8) translateY(20px); opacity: 0; }
+    to   { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .modal-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    margin-bottom: 6px;
+  }
+
+  .modal-title.win { color: var(--correct); text-shadow: var(--glow-green); }
+  .modal-title.lose { color: var(--accent); text-shadow: var(--glow-red); }
+
+  .modal-word {
+    font-family: 'Orbitron', monospace;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: var(--accent2);
+    text-shadow: var(--glow-cyan);
+    margin: 16px 0 8px;
+  }
+
+  .modal-def {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.7;
+    letter-spacing: 0.05em;
+    margin-bottom: 20px;
+  }
+
+  .modal-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    border: 1px solid var(--border);
+    padding: 10px 6px;
+  }
+
+  .stat-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+
+  .stat-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .modal-next {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+  }
+
+  .countdown {
+    font-family: 'Orbitron', monospace;
+    color: var(--accent2);
+    font-size: 1.1rem;
+  }
+
+  .btn-share {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    padding: 12px 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-transform: uppercase;
+  }
+
+  .btn-share:hover {
+    background: var(--accent2);
+    color: var(--bg);
+    box-shadow: var(--glow-cyan);
+  }
+
+  /* SCAN LINE effect */
+  .scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,245,255,0.15), transparent);
+    animation: scan 4s linear infinite;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  @keyframes scan {
+    0%   { top: -2px; }
+    100% { top: 100vh; }
+  }
+
+  /* Responsive */
+  @media (max-width: 400px) {
+    .tile { width: 52px; height: 52px; font-size: 1.2rem; }
+    .key { height: 46px; min-width: 32px; font-size: 0.65rem; }
+    .key.wide { min-width: 50px; }
+    .logo { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header>
+  <div class="header-top">
+    <div class="logo">LUK<span>·</span>WORDLE</div>
+    <div class="day-info">
+      <div class="day-num" id="day-num">#001</div>
+      <div id="date-display">CARGANDO...</div>
+    </div>
+  </div>
+  <div class="subtitle">// adivina la palabra del día · 5 letras · 6 intentos</div>
+</header>
+
+<div id="message-bar">&nbsp;</div>
+
+<div id="grid-wrap">
+  <div id="grid"></div>
+</div>
+
+<div id="keyboard"></div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">VICTORIA</div>
+    <div style="font-size:0.65rem; color:var(--muted); letter-spacing:0.15em; margin-bottom:4px;">PALABRA DEL DÍA</div>
+    <div class="modal-word" id="modal-word"></div>
+    <div class="modal-def" id="modal-def"></div>
+    <div class="modal-stats">
+      <div class="stat-box">
+        <div class="stat-num" id="stat-played">0</div>
+        <div class="stat-label">JUGADOS</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-wins">0</div>
+        <div class="stat-label">GANADOS</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-streak">0</div>
+        <div class="stat-label">RACHA</div>
+      </div>
+    </div>
+    <div class="modal-next">PRÓXIMA PALABRA EN<br><span class="countdown" id="countdown">00:00:00</span></div>
+    <button class="btn-share" onclick="shareResult()">⟳ COMPARTIR RESULTADO</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// WORD LIST — Spanish 5-letter words
+// ============================================================
+const WORDS = [
+  {w:"PLUMA",d:"Instrumento para escribir o pluma de ave"},
+  {w:"CIELO",d:"Espacio sobre la Tierra, donde están las nubes"},
+  {w:"LUZ",d:null},
+  {w:"FUEGO",d:"Calor y luz que produce la combustión"},
+  {w:"MUNDO",d:"El planeta Tierra y todo lo que hay en él"},
+  {w:"CARTA",d:"Documento escrito que se envía a alguien"},
+  {w:"BRUMA",d:"Niebla suave que cubre el mar o la tierra"},
+  {w:"LLAVE",d:"Instrumento para abrir y cerrar cerraduras"},
+  {w:"FLOTA",d:"Conjunto de barcos o aviones"},
+  {w:"GRUTA",d:"Cueva natural o artificial"},
+  {w:"ARENA",d:"Conjunto de granos finos de roca"},
+  {w:"TRONO",d:"Asiento regio, símbolo del poder real"},
+  {w:"NOCHE",d:"Período de oscuridad entre dos días"},
+  {w:"CAMPO",d:"Extensión de tierra cultivada o abierta"},
+  {w:"SELVA",d:"Bosque tropical muy denso y húmedo"},
+  {w:"CLIMA",d:"Conjunto de condiciones atmosféricas de un lugar"},
+  {w:"VIENTO",d:null},
+  {w:"TORRE",d:"Construcción alta y estrecha"},
+  {w:"MARES",d:"Plural de mar, grandes extensiones de agua salada"},
+  {w:"SUELO",d:"Superficie de la Tierra donde pisamos"},
+  {w:"RAMAS",d:"Partes que crecen del tronco de un árbol"},
+  {w:"GLOBO",d:"Esfera o balón; también el planeta Tierra"},
+  {w:"PLAZO",d:"Período de tiempo señalado para algo"},
+  {w:"BRISA",d:"Viento suave y agradable"},
+  {w:"LECHO",d:"Cama o fondo de un río"},
+  {w:"POLVO",d:"Partículas finas de tierra en el aire"},
+  {w:"HUESO",d:"Pieza dura que forma el esqueleto"},
+  {w:"FINCA",d:"Terreno con construcciones, generalmente rural"},
+  {w:"TECHO",d:"Parte superior de una construcción"},
+  {w:"MONTE",d:"Elevación del terreno; también bosque"},
+  {w:"CLAVO",d:"Pieza metálica puntiaguda para fijar cosas"},
+  {w:"PLAYA",d:"Orilla del mar con arena o piedras"},
+  {w:"VIAJE",d:"Desplazamiento a un lugar distante"},
+  {w:"SEÑAL",d:"Indicación que advierte o informa"},
+  {w:"ORDEN",d:"Disposición correcta; también mandato"},
+  {w:"CORTE",d:"Acción de cortar; también la corte real"},
+  {w:"NUBES",d:"Masas de vapor de agua en la atmósfera"},
+  {w:"FONDO",d:"Parte más profunda o inferior de algo"},
+  {w:"RASGO",d:"Característica distintiva de una persona o cosa"},
+  {w:"BOLSA",d:"Recipiente flexible para llevar cosas"},
+  {w:"CLAVE",d:"Código secreto; también algo fundamental"},
+  {w:"PECHO",d:"Parte anterior del tronco humano"},
+  {w:"RUMBO",d:"Dirección que sigue un barco o persona"},
+  {w:"VELAS",d:"Telas que reciben el viento en un barco"},
+  {w:"CASCO",d:"Protección para la cabeza; también el cuerpo de un barco"},
+  {w:"BUQUE",d:"Embarcación grande de navegación"},
+  {w:"TRAMA",d:"Argumento de una historia; también tejido"},
+  {w:"LAZO",d:null},
+  {w:"NORTE",d:"Punto cardinal opuesto al sur"},
+  {w:"VERSO",d:"Línea de un poema"},
+  {w:"CANTO",d:"Acción de cantar; también borde de algo"},
+  {w:"PULSO",d:"Latido de la sangre en las arterias"},
+  {w:"HUEVO",d:"Célula reproductora de las aves"},
+  {w:"MUELA",d:"Diente posterior para masticar"},
+  {w:"PALMA",d:"Árbol tropical; también la parte interna de la mano"},
+  {w:"SABOR",d:"Sensación producida en el paladar"},
+  {w:"COLOR",d:"Impresión producida por la luz en los ojos"},
+  {w:"VALOR",d:"Cualidad de quien afronta peligros con valentía"},
+  {w:"CALOR",d:"Sensación de temperatura elevada"},
+  {w:"VAPOR",d:"Gas que se forma al calentar agua"},
+  {w:"TUMOR",d:"Masa anormal de tejido en el cuerpo"},
+  {w:"TEMOR",d:"Sentimiento de miedo ante un peligro"},
+  {w:"HONOR",d:"Cualidad moral de quien actúa con rectitud"},
+  {w:"ERROR",d:"Acción equivocada o falsa"},
+  {w:"RIGOR",d:"Precisión y exactitud extremas"},
+  {w:"VIGOR",d:"Fuerza y energía física o moral"},
+  {w:"LIMON",d:"Fruto ácido de color amarillo"},
+  {w:"JABON",d:"Producto para limpiar y lavar"},
+  {w:"COLON",d:"Parte del intestino grueso"},
+  {w:"BOTON",d:"Pequeño objeto para abrochar ropa"},
+  {w:"AVION",d:"Aeronave más pesada que el aire"},
+  {w:"BACON",d:"Tocino ahumado de origen anglosajón"},
+  {w:"SALON",d:"Habitación grande de una casa"},
+  {w:"TALON",d:"Parte posterior del pie"},
+  {w:"TACON",d:"Pieza que eleva el talón del calzado"},
+  {w:"RAZON",d:"Facultad de pensar y entender"},
+  {w:"VAGON",d:"Cada unidad de un tren de carga o pasajeros"},
+  {w:"FAJON",d:"Faja grande que se usa como prenda"},
+  {w:"CAJON",d:"Compartimento con forma de caja"},
+  {w:"LADON",d:null},
+  {w:"MAGON",d:null},
+  {w:"RATON",d:"Pequeño roedor doméstico o de campo"},
+  {w:"PATON",d:null},
+  {w:"GAMON",d:null},
+  {w:"BARON",d:"Título de nobleza"},
+  {w:"REINA",d:"Mujer que reina o esposa del rey"},
+  {w:"PRIMA",d:"Hija de un tío; también premio o ventaja"},
+  {w:"PISTA",d:"Indicio o señal; también superficie para correr"},
+  {w:"VISTA",d:"Sentido que permite ver; también paisaje"},
+  {w:"LISTA",d:"Enumeración de elementos"},
+  {w:"COSTA",d:"Orilla del mar; también precio o gasto"},
+  {w:"PASTA",d:"Masa blanda; también alimento de harina"},
+  {w:"FIESTA",d:null},
+  {w:"BROMA",d:"Dicho o hecho gracioso para hacer reír"},
+  {w:"CROMA",d:"Color o cromatismo"},
+  {w:"DRAMA",d:"Obra teatral de tono serio"},
+  {w:"LLAMA",d:"Lengua de fuego; también animal camélido"},
+  {w:"CALMA",d:"Estado de tranquilidad y paz"},
+  {w:"PALMA",d:"Árbol tropical; interior de la mano"},
+  {w:"BALMA",d:null},
+  {w:"NORMA",d:"Regla o precepto de conducta"},
+  {w:"FORMA",d:"Figura o configuración exterior de algo"},
+  {w:"TORNA",d:"Acción de tornar o volver"},
+  {w:"CUEVA",d:"Cavidad natural en la tierra o en las rocas"},
+  {w:"NUEVA",d:"Femenino de nuevo; también noticia"},
+  {w:"LLUVIA",d:null},
+  {w:"COPIA",d:"Reproducción de algo original"},
+  {w:"MAFIA",d:"Organización criminal secreta"},
+  {w:"SOFIA",d:"Capital de Bulgaria; también nombre propio"},
+  {w:"LIDIA",d:"Corrida de toros; también nombre propio"},
+  {w:"INDIA",d:"País del sur de Asia"},
+  {w:"RADIO",d:"Aparato receptor de ondas; también elemento químico"},
+  {w:"VIDEO",d:"Grabación de imágenes en movimiento"},
+  {w:"AUDIO",d:"Relativo al sonido"},
+  {w:"ROCIO",d:"Gotitas de agua que caen por la noche"},
+  {w:"JUNCO",d:"Planta acuática de tallo largo"},
+  {w:"BANCO",d:"Asiento largo; también entidad financiera"},
+  {w:"BLANCO",d:null},
+  {w:"MANCO",d:"Persona que ha perdido una mano o brazo"},
+  {w:"PANCO",d:null},
+  {w:"PISCO",d:"Aguardiente de uva originario de Perú"},
+  {w:"DISCO",d:"Objeto circular; también música grabada"},
+  {w:"CISCO",d:"Carbón menudo; también alboroto"},
+  {w:"TURCO",d:"Natural de Turquía"},
+  {w:"MARCO",d:"Borde que rodea un cuadro o ventana"},
+  {w:"LARGO",d:"Que tiene mucha extensión de longitud"},
+  {w:"CARGO",d:"Responsabilidad o empleo"},
+  {w:"FARGO",d:null},
+  {w:"HIELO",d:"Agua en estado sólido"},
+  {w:"SUELO",d:"Superficie de la Tierra o de una habitación"},
+  {w:"VUELO",d:"Acción de volar; también trayecto aéreo"},
+  {w:"DUELO",d:"Combate entre dos personas; también tristeza"},
+  {w:"PUEBLO",d:null},
+  {w:"CIEGO",d:"Persona que no puede ver"},
+  {w:"JUEGO",d:"Actividad recreativa con reglas"},
+  {w:"RUEDO",d:"Redondel de una plaza de toros"},
+  {w:"MIEDO",d:"Perturbación angustiosa ante un peligro"},
+  {w:"PREDA",d:null},
+  {w:"BELLO",d:"Que tiene belleza"},
+  {w:"SELLO",d:"Marca o estampilla oficial"},
+  {w:"MELLO",d:null},
+  {w:"CUELLO",d:null},
+  {w:"POLLO",d:"Cría de la gallina"},
+  {w:"ROLLO",d:"Objeto enrollado; también algo aburrido"},
+  {w:"FALLO",d:"Error o equivocación; también sentencia"},
+  {w:"TALLO",d:"Parte de la planta que sostiene las hojas"},
+  {w:"GALLO",d:"Ave doméstica macho"},
+  {w:"HALLO",d:"Primera persona del verbo hallar"},
+  {w:"VALLO",d:null},
+  {w:"BELLO",d:"Que tiene belleza y atractivo"},
+  {w:"TIGRE",d:"Gran felino de rayas negras y fondo naranja"},
+  {w:"LIEBRE",d:null},
+  {w:"SABRE",d:"Espada curva de filo por un solo lado"},
+  {w:"PADRE",d:"Hombre que tiene hijos"},
+  {w:"MADRE",d:"Mujer que tiene hijos"},
+  {w:"SOBRE",d:"Envoltorio para cartas; también encima de"},
+  {w:"LIBRE",d:"Que tiene libertad"},
+  {w:"NOBLE",d:"De alta condición social; también honorable"},
+  {w:"DOBLE",d:"Que vale o pesa dos veces más"},
+  {w:"CABLE",d:"Hilo grueso o conductor eléctrico"},
+  {w:"FABLE",d:null},
+  {w:"CICLO",d:"Serie de fenómenos que se repiten en orden"},
+  {w:"SIGLO",d:"Período de cien años"},
+  {w:"HIMNO",d:"Canto solemne en honor a algo o alguien"},
+  {w:"CENSO",d:"Conteo oficial de la población"},
+  {w:"DENSO",d:"Compacto, apretado, de mucha materia"},
+  {w:"TENSO",d:"Estirado con fuerza; también nervioso"},
+  {w:"VERSO",d:"Línea de una composición poética"},
+  {w:"TORSO",d:"Tronco del cuerpo humano sin cabeza ni extremidades"},
+  {w:"CURSO",d:"Serie de clases; también dirección de algo"},
+  {w:"PULSO",d:"Latido rítmico de las arterias"},
+  {w:"BOLSO",d:"Bolsa que se lleva en la mano o al hombro"},
+  {w:"GOLSO",d:null},
+  {w:"FALSO",d:"Que no es verdadero o auténtico"},
+  {w:"SALSA",d:"Condimento líquido para acompañar comidas"},
+  {w:"PULGA",d:"Pequeño insecto parásito saltador"},
+  {w:"BUENA",d:"Femenino de bueno; que tiene bondad"},
+  {w:"BUENO",d:"Que tiene bondad o es de calidad"},
+  {w:"TURNO",d:"Vez que corresponde a alguien"},
+  {w:"BURRO",d:"Animal de carga; también persona torpe"},
+  {w:"CHURRO",d:null},
+  {w:"PERRO",d:"Animal doméstico, el mejor amigo del hombre"},
+  {w:"FERRO",d:"Relativo al hierro"},
+  {w:"CERRO",d:"Elevación del terreno, colina"},
+  {w:"YERRO",d:"Error o equivocación"},
+  {w:"CARRO",d:"Vehículo de transporte"},
+  {w:"BARRO",d:"Mezcla de tierra y agua"},
+  {w:"DARRO",d:null},
+  {w:"FORRO",d:"Material interior que recubre algo"},
+  {w:"MORRO",d:"Hocico; también saliente de tierra"},
+  {w:"GORRO",d:"Prenda que cubre la cabeza"},
+  {w:"ZORRO",d:"Animal carnívoro astuto de cola peluda"},
+  {w:"JARRO",d:"Recipiente con asa para líquidos"},
+  {w:"NARRO",d:"Primera persona del verbo narrar"},
+  {w:"PARRO",d:null},
+  {w:"ROBLE",d:"Árbol de madera dura y resistente"},
+  {w:"TREBOL",d:null},
+  {w:"NIETO",d:"Hijo del hijo de alguien"},
+  {w:"TRATO",d:"Manera de relacionarse con alguien"},
+  {w:"GRATO",d:"Que produce agrado o satisfacción"},
+  {w:"PRATO",d:null},
+  {w:"RASCA",d:"Acción de rascar"},
+  {w:"MASCA",d:"Acción de masticar"},
+  {w:"TOSCA",d:"Grosera, sin refinamiento"},
+  {w:"ROSCA",d:"Pan o pastel en forma de anillo"},
+  {w:"MOSCA",d:"Insecto volador común"},
+  {w:"BARCA",d:"Embarcación pequeña"},
+  {w:"FARCA",d:null},
+  {w:"MARCA",d:"Señal; también empresa o producto"},
+  {w:"PARCA",d:"La muerte personificada; también sobria"},
+  {w:"NARCA",d:null},
+  {w:"HARCA",d:null},
+  {w:"CERCA",d:"Próximo en distancia; también vallado"},
+  {w:"ZURCA",d:null},
+  {w:"BUSCA",d:"Acción de buscar"},
+  {w:"TOSCA",d:"Sin refinamiento, basta"},
+  {w:"CASCA",d:"Cáscara; acción de cascar"},
+  {w:"PASCA",d:null},
+  {w:"RESCA",d:null},
+  {w:"TRUCO",d:"Habilidad o ingenio para lograr algo"},
+  {w:"CRUDO",d:"Sin cocinar; también áspero"},
+  {w:"AGUDO",d:"Afilado; de alta frecuencia sonora; perspicaz"},
+  {w:"DESNUDO",d:null},
+  {w:"MUDO",d:"Que no puede hablar"},
+  {w:"NUDO",d:"Enlace de hilos o cuerdas"},
+  {w:"PRADO",d:"Terreno húmedo con hierba"},
+  {w:"GRADO",d:"Unidad de medida; también nivel o intensidad"},
+  {w:"CALDO",d:"Líquido resultante de cocer alimentos"},
+  {w:"FALDA",d:"Prenda de vestir; también ladera de montaña"},
+  {w:"BALDA",d:"Estante de madera"},
+  {w:"PALDA",d:null},
+  {w:"SALDA",d:"Acción de saldar"},
+  {w:"GUARDA",d:null},
+  {w:"MANDA",d:"Ordena; también legado en un testamento"},
+  {w:"BANDA",d:"Grupo musical; también franja o cinta"},
+  {w:"PANDA",d:"Oso panda; también pandilla"},
+  {w:"TIENDA",d:null},
+  {w:"LEYENDA",d:null},
+  {w:"LINDA",d:"Bonita, atractiva"},
+  {w:"PINTA",d:"Aspecto exterior; también unidad de medida"},
+  {w:"MENTA",d:"Planta aromática usada en infusiones"},
+  {w:"CUENTA",d:null},
+  {w:"RENTA",d:"Beneficio regular que produce algo"},
+  {w:"VENTA",d:"Acción de vender; también posada"},
+  {w:"JUNTA",d:"Reunión de personas; también unión"},
+  {w:"PUNTA",d:"Extremo agudo de algo"},
+  {w:"BUNTA",d:null},
+  {w:"LENTA",d:"Femenino de lento; que tarda mucho"},
+  {w:"DENTA",d:null},
+  {w:"FUNDA",d:"Cubierta que protege algo"},
+  {w:"RONDA",d:"Vigilancia nocturna; también vuelta"},
+  {w:"HONDA",d:"Profunda; también arma de tiro"},
+  {w:"ONDA",d:null},
+  {w:"GRANJA",d:null},
+  {w:"CANJA",d:null},
+  {w:"CANJA",d:null},
+].filter(entry => entry.w.length === 5);
+
+// Remove duplicates
+const seen = new Set();
+const WORD_LIST = WORDS.filter(entry => {
+  if (seen.has(entry.w)) return false;
+  seen.add(entry.w);
+  return true;
+});
+
+// ============================================================
+// VALID GUESS WORDS (extended set for validation)
+// ============================================================
+// For simplicity, any 5-letter combination of Spanish letters is accepted
+
+// ============================================================
+// DAILY WORD SELECTION
+// ============================================================
+function getDayIndex() {
+  const epoch = new Date('2025-01-01T00:00:00');
+  const now = new Date();
+  const diff = Math.floor((now - epoch) / (1000 * 60 * 60 * 24));
+  return diff % WORD_LIST.length;
+}
+
+const DAY_INDEX = getDayIndex();
+const DAILY_ENTRY = WORD_LIST[DAY_INDEX];
+const ANSWER = DAILY_ENTRY.w;
+
+// ============================================================
+// STATE
+// ============================================================
+const STORAGE_KEY = 'lukso_wordle_v1';
+
+function getState() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const s = JSON.parse(stored);
+      if (s.dayIndex === DAY_INDEX) return s;
+    }
+  } catch(e) {}
+  return {
+    dayIndex: DAY_INDEX,
+    guesses: [],      // array of strings
+    results: [],      // array of arrays ['correct','absent',...]
+    status: 'playing' // 'playing'|'win'|'lose'
+  };
+}
+
+function saveState(s) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+}
+
+function getStats() {
+  try {
+    return JSON.parse(localStorage.getItem('lukso_wordle_stats')) || {played:0, wins:0, streak:0, lastWinDay:-1};
+  } catch(e) {
+    return {played:0, wins:0, streak:0, lastWinDay:-1};
+  }
+}
+
+function saveStats(st) {
+  localStorage.setItem('lukso_wordle_stats', JSON.stringify(st));
+}
+
+// ============================================================
+// GAME
+// ============================================================
+let state = getState();
+let currentRow = state.guesses.length;
+let currentGuess = '';
+let isAnimating = false;
+
+const KEYBOARD_ROWS = [
+  ['Q','W','E','R','T','Y','U','I','O','P'],
+  ['A','S','D','F','G','H','J','K','L','Ñ'],
+  ['ENTER','Z','X','C','V','B','N','M','⌫']
+];
+
+// Build UI
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (let r = 0; r < 6; r++) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.id = 'row-' + r;
+    for (let c = 0; c < 5; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = `tile-${r}-${c}`;
+      row.appendChild(tile);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  KEYBOARD_ROWS.forEach(keys => {
+    const row = document.createElement('div');
+    row.className = 'kb-row';
+    keys.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (k === 'ENTER' || k === '⌫' ? ' wide' : '');
+      btn.textContent = k;
+      btn.dataset.key = k;
+      btn.addEventListener('click', () => handleKey(k));
+      row.appendChild(btn);
+    });
+    kb.appendChild(row);
+  });
+}
+
+function updateDisplay() {
+  // Restore previous guesses
+  state.guesses.forEach((guess, r) => {
+    for (let c = 0; c < 5; c++) {
+      const tile = document.getElementById(`tile-${r}-${c}`);
+      tile.textContent = guess[c];
+      tile.className = 'tile ' + state.results[r][c];
+    }
+  });
+  // Update keyboard colors
+  const keyColors = {};
+  state.guesses.forEach((guess, r) => {
+    for (let c = 0; c < 5; c++) {
+      const letter = guess[c];
+      const result = state.results[r][c];
+      const priority = {correct:3, present:2, absent:1};
+      if (!keyColors[letter] || priority[result] > priority[keyColors[letter]]) {
+        keyColors[letter] = result;
+      }
+    }
+  });
+  document.querySelectorAll('.key').forEach(btn => {
+    const k = btn.dataset.key;
+    if (keyColors[k]) btn.classList.add(keyColors[k]);
+  });
+}
+
+// Header
+function setupHeader() {
+  const now = new Date();
+  document.getElementById('day-num').textContent = '#' + String(DAY_INDEX + 1).padStart(3, '0');
+  const days = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+  const months = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+  document.getElementById('date-display').textContent =
+    `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+// Message
+let msgTimeout;
+function showMessage(msg, duration = 2000) {
+  const bar = document.getElementById('message-bar');
+  bar.textContent = msg;
+  clearTimeout(msgTimeout);
+  if (duration > 0) {
+    msgTimeout = setTimeout(() => { bar.textContent = '\u00a0'; }, duration);
+  }
+}
+
+// Evaluate guess
+function evaluateGuess(guess) {
+  const result = Array(5).fill('absent');
+  const answerArr = ANSWER.split('');
+  const guessArr = guess.split('');
+  const used = Array(5).fill(false);
+
+  // First pass: correct
+  for (let i = 0; i < 5; i++) {
+    if (guessArr[i] === answerArr[i]) {
+      result[i] = 'correct';
+      used[i] = true;
+    }
+  }
+  // Second pass: present
+  for (let i = 0; i < 5; i++) {
+    if (result[i] === 'correct') continue;
+    for (let j = 0; j < 5; j++) {
+      if (!used[j] && guessArr[i] === answerArr[j]) {
+        result[i] = 'present';
+        used[j] = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+function handleKey(key) {
+  if (state.status !== 'playing' || isAnimating) return;
+
+  if (key === '⌫' || key === 'BACKSPACE') {
+    if (currentGuess.length > 0) {
+      currentGuess = currentGuess.slice(0, -1);
+      renderCurrentGuess();
+    }
+    return;
+  }
+
+  if (key === 'ENTER') {
+    submitGuess();
+    return;
+  }
+
+  // Letter
+  const letter = key.toUpperCase();
+  if (/^[A-ZÑ]$/.test(letter) && currentGuess.length < 5) {
+    currentGuess += letter;
+    renderCurrentGuess();
+  }
+}
+
+function renderCurrentGuess() {
+  for (let c = 0; c < 5; c++) {
+    const tile = document.getElementById(`tile-${currentRow}-${c}`);
+    const letter = currentGuess[c] || '';
+    tile.textContent = letter;
+    if (letter) {
+      tile.className = 'tile filled';
+    } else {
+      tile.className = 'tile';
+    }
+  }
+}
+
+function submitGuess() {
+  if (currentGuess.length < 5) {
+    showMessage('// FALTAN LETRAS');
+    shakeRow(currentRow);
+    return;
+  }
+
+  const result = evaluateGuess(currentGuess);
+  const guess = currentGuess;
+  isAnimating = true;
+
+  // Flip animation
+  flipReveal(currentRow, guess, result, () => {
+    // Update state
+    state.guesses.push(guess);
+    state.results.push(result);
+
+    const won = result.every(r => r === 'correct');
+    if (won) {
+      state.status = 'win';
+      updateStats(true);
+    } else if (state.guesses.length >= 6) {
+      state.status = 'lose';
+      updateStats(false);
+    }
+
+    saveState(state);
+    currentRow++;
+    currentGuess = '';
+
+    // Update keyboard
+    const priority = {correct:3, present:2, absent:1};
+    for (let c = 0; c < 5; c++) {
+      const letter = guess[c];
+      const keyBtn = document.querySelector(`.key[data-key="${letter}"]`);
+      if (keyBtn) {
+        const current = keyBtn.className.match(/correct|present|absent/)?.[0];
+        const newResult = result[c];
+        if (!current || priority[newResult] > priority[current]) {
+          keyBtn.classList.remove('correct', 'present', 'absent');
+          keyBtn.classList.add(newResult);
+        }
+      }
+    }
+
+    isAnimating = false;
+
+    if (state.status === 'win') {
+      const messages = ['// PERFECTO', '// BRILLANTE', '// EXCELENTE', '// GENIAL', '// BIEN HECHO', '// CONSEGUIDO'];
+      showMessage(messages[Math.min(state.guesses.length - 1, messages.length - 1)], 0);
+      setTimeout(() => openModal(), 1200);
+    } else if (state.status === 'lose') {
+      showMessage('// LA PALABRA ERA: ' + ANSWER, 0);
+      setTimeout(() => openModal(), 1500);
+    }
+  });
+}
+
+function flipReveal(row, guess, result, callback) {
+  let delay = 0;
+  for (let c = 0; c < 5; c++) {
+    const tile = document.getElementById(`tile-${row}-${c}`);
+    const resultClass = result[c];
+    const d = delay;
+    setTimeout(() => {
+      tile.style.animation = 'none';
+      tile.offsetHeight; // reflow
+      tile.style.animation = `flip 0.5s ease forwards`;
+      setTimeout(() => {
+        tile.className = 'tile ' + resultClass;
+        tile.style.animation = '';
+      }, 250);
+    }, d);
+    delay += 100;
+  }
+  setTimeout(callback, delay + 300);
+}
+
+function shakeRow(row) {
+  const rowEl = document.getElementById('row-' + row);
+  rowEl.querySelectorAll('.tile').forEach(t => {
+    t.classList.add('shake');
+    setTimeout(() => t.classList.remove('shake'), 400);
+  });
+}
+
+// ============================================================
+// STATS & MODAL
+// ============================================================
+function updateStats(won) {
+  const stats = getStats();
+  stats.played++;
+  if (won) {
+    stats.wins++;
+    if (stats.lastWinDay === DAY_INDEX - 1) {
+      stats.streak++;
+    } else {
+      stats.streak = 1;
+    }
+    stats.lastWinDay = DAY_INDEX;
+  } else {
+    stats.streak = 0;
+  }
+  saveStats(stats);
+}
+
+function openModal() {
+  const stats = getStats();
+  const modal = document.getElementById('modal');
+  const title = document.getElementById('modal-title');
+
+  if (state.status === 'win') {
+    title.textContent = '// VICTORIA';
+    title.className = 'modal-title win';
+  } else {
+    title.textContent = '// GAME OVER';
+    title.className = 'modal-title lose';
+  }
+
+  document.getElementById('modal-word').textContent = ANSWER;
+  document.getElementById('modal-def').textContent = DAILY_ENTRY.d || '';
+  document.getElementById('stat-played').textContent = stats.played;
+  document.getElementById('stat-wins').textContent = stats.wins;
+  document.getElementById('stat-streak').textContent = stats.streak;
+
+  modal.classList.add('show');
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  const diff = tomorrow - now;
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  document.getElementById('countdown').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function shareResult() {
+  const emojis = {correct:'🟩', present:'🟨', absent:'⬛'};
+  let text = `LUK·WORDLE #${DAY_INDEX + 1}\n`;
+  text += state.status === 'win' ? `${state.guesses.length}/6` : 'X/6';
+  text += '\n\n';
+  state.results.forEach(row => {
+    text += row.map(r => emojis[r]).join('') + '\n';
+  });
+  text += '\nlukso.network';
+
+  if (navigator.share) {
+    navigator.share({ text });
+  } else {
+    navigator.clipboard.writeText(text).then(() => {
+      showMessage('// RESULTADO COPIADO AL PORTAPAPELES');
+    });
+  }
+}
+
+// ============================================================
+// KEYBOARD INPUT
+// ============================================================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Backspace') handleKey('BACKSPACE');
+  else if (e.key === 'Enter') handleKey('ENTER');
+  else if (/^[a-zA-ZñÑ]$/.test(e.key)) handleKey(e.key.toUpperCase());
+});
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  setupHeader();
+  buildGrid();
+  buildKeyboard();
+  updateDisplay();
+
+  if (state.status !== 'playing') {
+    currentRow = state.guesses.length;
+    if (state.status === 'lose') {
+      showMessage('// LA PALABRA ERA: ' + ANSWER, 0);
+    } else {
+      showMessage('// YA JUGASTE HOY · VUELVE MAÑANA', 0);
+    }
+    setTimeout(() => openModal(), 800);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
