@@ -483,7 +483,7 @@
 <div id="keyboard"></div>
 
 <!-- MODAL -->
-<div id="modal">
+<div id="modal" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="modal-box">
     <div class="modal-title" id="modal-title">VICTORIA</div>
     <div style="font-size:0.65rem; color:var(--muted); letter-spacing:0.15em; margin-bottom:4px;">PALABRA DEL DÍA</div>
@@ -504,7 +504,7 @@
       </div>
     </div>
     <div class="modal-next">PRÓXIMA PALABRA EN<br><span class="countdown" id="countdown">00:00:00</span></div>
-    <button class="btn-share" onclick="shareResult()">⟳ COMPARTIR RESULTADO</button>
+    <button class="btn-share" onclick="document.getElementById('modal').classList.remove('show')">× CERRAR</button>
   </div>
 </div>
 
